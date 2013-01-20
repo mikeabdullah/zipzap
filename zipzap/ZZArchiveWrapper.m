@@ -175,6 +175,10 @@
 	if (self = [self init])
 	{
 		_archiveEntry = entry;
+		
+		NSString *filename = [[entry fileName] lastPathComponent];	// entry might be nested inside a directory, so grab just last component
+		[self setFilename:filename];
+		[self setPreferredFilename:filename];
 	}
 	return self;
 }
