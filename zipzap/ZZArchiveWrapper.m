@@ -100,6 +100,19 @@
 	return self;
 }
 
+- (id)initRegularFileWithContents:(NSData *)contents;
+{
+	if (self = [super initRegularFileWithContents:contents])
+	{
+		if (contents)
+		{
+			ZZArchive *archive = [ZZArchive archiveWithData:contents];
+			[self readFromArchive:archive error:NULL];
+		}
+	}
+	return self;
+}
+
 - (BOOL)readFromURL:(NSURL *)url options:(NSFileWrapperReadingOptions)options error:(NSError *__autoreleasing *)outError;
 {
 	ZZArchive *archive = [ZZArchive archiveWithContentsOfURL:url];
@@ -115,29 +128,33 @@
 			return NO;
 		}
 		
-		
 		// In the unlikely event that super and ZZArchive disagree about the contents of the file, assume it's no longer an archive
 		if (![self isRegularFile]) return YES;
 		
-		
-		// Assemble the entries into a directory structure
-		_rootWrapper = [[NSFileWrapper alloc] initDirectoryWithFileWrappers:nil];
-		
-		for (ZZArchiveEntry *anEntry in entries)
-		{
-			ZZArchiveWrapper *wrapper = [[ZZArchiveWrapper alloc] initWithArchiveEntry:anEntry];
-			[self addFileWrapper:wrapper subdirectory:[[anEntry fileName] stringByDeletingLastPathComponent]];
-		}
-		
-		// TODO: Make sure NSFileWrapper hasn't adjusted any file names from what they are in the archive
-		
-		return YES;
+		// Load the entries
+		return [self readFromArchive:archive error:outError];
 	}
 	else
 	{
 		// Fallback to regular reading
 		return [super readFromURL:url options:options error:outError];
 	}
+}
+
+- (BOOL)readFromArchive:(ZZArchive *)archive error:(NSError *__autoreleasing *)error;
+{
+	// Assemble the entries into a directory structure
+	_rootWrapper = [[NSFileWrapper alloc] initDirectoryWithFileWrappers:nil];
+	
+	for (ZZArchiveEntry *anEntry in archive.entries)
+	{
+		ZZArchiveWrapper *wrapper = [[ZZArchiveWrapper alloc] initWithArchiveEntry:anEntry];
+		[self addFileWrapper:wrapper subdirectory:[[anEntry fileName] stringByDeletingLastPathComponent]];
+	}
+	
+	// TODO: Make sure NSFileWrapper hasn't adjusted any file names from what they are in the archive
+	
+	return YES;
 }
 
 #pragma mark Archive Status

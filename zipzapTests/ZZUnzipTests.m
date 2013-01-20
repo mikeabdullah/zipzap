@@ -243,29 +243,43 @@
 {
 	NSData* rawData = [NSData dataWithContentsOfURL:_zipFileURL];
 	ZZArchive* zipFileFromData = [[ZZArchive alloc] initWithData:rawData encoding:NSUTF8StringEncoding];
+	ZZArchiveWrapper *wrapperFromData = [[ZZArchiveWrapper alloc] initRegularFileWithContents:rawData];
     
 	STAssertEquals(_zipFile.entries.count,
 				   zipFileFromData.entries.count,
 				   @"zipFileFromData.entries.count must match the original file count.");
 	
+	// Test ZZArchiveWrapper too, although this makes the assumption there are no files nested inside directories
+	STAssertEquals(_zipFile.entries.count,
+				   wrapperFromData.fileWrappers.count,
+				   @"wrapperFromData.fileWrappers.count must match the original file count.");
+	
 	for (NSUInteger index = 0, count = _zipFile.entries.count; index < count; ++index)
 	{
 		ZZArchiveEntry* zipEntry = _zipFile.entries[index];
 		ZZArchiveEntry* zipFromDataEntry = zipFileFromData.entries[index];
+		
+		NSString *filename = [zipEntry fileName];
+		NSFileWrapper *wrapper = [[wrapperFromData fileWrappers] objectForKey:filename];
+		STAssertNotNil(wrapper, @"Wrapper contains nothing for key: %@", filename);
 
 		STAssertEquals(zipEntry.compressed, zipFromDataEntry.compressed, @"zipFromDataEntry.entries[%s].compressed must match the reference entry.", index);
 
 		STAssertEquals(zipEntry.crc32, zipFromDataEntry.crc32, @"zipFromDataEntry.entries[%s].crc32 must match the reference entry.", index);
 
 		STAssertEqualObjects(zipEntry.data, zipFromDataEntry.data, @"zipFromDataEntry.entries[%s].data must match the reference entry.", index);
+		STAssertEqualObjects(zipEntry.data, wrapper.regularFileContents, @"wrapperFromDataEntry.fileWrappers[%@].regularFileContents must match the reference entry.", filename);
 
 		STAssertEquals(zipEntry.fileMode, zipFromDataEntry.fileMode, @"zipFromDataEntry.entries[%s].fileMode must match the reference entry.", index);
+		STAssertEquals(zipEntry.fileMode, (mode_t)[[wrapper.fileAttributes objectForKey:NSFilePosixPermissions] unsignedShortValue], @"wrapperFromDataEntry.fileWrappers[%@].fileAttributes.filePosixPermissions must match the reference entry.", filename);
 
 		STAssertEqualObjects(zipEntry.fileName, zipFromDataEntry.fileName, @"zipFromDataEntry.entries[%s].fileName must match the reference entry.", index);
+		STAssertEqualObjects(zipEntry.fileName, wrapper.filename, @"wrapperFromDataEntry.fileWrappers[%@].filename must match the reference entry.", filename);
 
 		STAssertEquals(zipEntry.compressedSize, zipFromDataEntry.compressedSize, @"zipFromDataEntry.entries[%s].compressedSize must match the reference entry.", index);
 
 		STAssertEquals(zipEntry.uncompressedSize, zipFromDataEntry.uncompressedSize, @"zipFromDataEntry.entries[%s].uncompressedSize must match the reference entry.", index);
+		STAssertEquals(zipEntry.uncompressedSize, wrapper.fileAttributes.fileSize, @"wrapperFromDataEntry.fileWrappers[%@].fileAttributes.fileSize must match the reference entry.", filename);
 	}
 }
 

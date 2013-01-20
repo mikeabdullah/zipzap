@@ -20,6 +20,9 @@
 // If the URL turns out to hold a zip file, reports YES from -isArchive and therefore becomes editable
 - (id)initWithURL:(NSURL *)url options:(NSFileWrapperReadingOptions)options error:(NSError *__autoreleasing *)outError;
 
+// Attempts to interpret the data as a zip file. -isArchive indicates success
+- (id)initRegularFileWithContents:(NSData *)contents;
+
 
 #pragma mark Testing for Archives
 // If -isArchive returns YES (guaranteed to if you used -initArchiveWithFileWrapper:) allows full access to modifying -fileWrappers
