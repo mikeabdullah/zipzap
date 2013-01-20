@@ -18,13 +18,25 @@
 
 - (void)zz_addArchiveEntriesToMutableArray:(NSMutableArray *)array filename:(NSString *)filename;
 {
-    if ([self isDirectory])
+    NSDictionary *attributes = [self fileAttributes];
+	NSDate *modDate = [attributes fileModificationDate];
+	
+	if ([self isDirectory])
     {
         // Entry for the directory itself. Skip for root directory
         if (filename)
         {
             if (![filename hasSuffix:@"/"]) filename = [filename stringByAppendingString:@"/"];
-            [array addObject:[ZZArchiveEntry archiveEntryWithDirectoryName:filename]];
+			
+			ZZArchiveEntry *entry = [ZZArchiveEntry archiveEntryWithFileName:filename
+																	fileMode:S_IFDIR | S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH	// cheat and match ZZNewArchiveEntry's internals for now
+																lastModified:(modDate ? modDate : [NSDate date])
+															compressionLevel:0		// directories can't be compressed
+																   dataBlock:nil	// and of course have no data
+																 streamBlock:nil
+														   dataConsumerBlock:nil];
+			
+            [array addObject:entry];
         }
         else
         {
@@ -39,9 +51,17 @@
     }
     else
     {
-        [array addObject:[ZZArchiveEntry archiveEntryWithFileName:filename compress:YES dataBlock:^NSData *{
-            return [self regularFileContents];
-        }]];
+		ZZArchiveEntry *entry = [ZZArchiveEntry archiveEntryWithFileName:filename
+																fileMode:S_IFREG | S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH	// cheat and match ZZNewArchiveEntry's internals for now
+															lastModified:(modDate ? modDate : [NSDate date])
+														compressionLevel:-1			// always use compression for now
+															   dataBlock:^NSData *{
+																   return [self regularFileContents];
+															   }
+															 streamBlock:nil
+													   dataConsumerBlock:nil];
+		
+        [array addObject:entry];
     }
 }
 

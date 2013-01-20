@@ -267,9 +267,11 @@
 	NSMutableArray* newEntries = [NSMutableArray array];
 	for (NSString* entryFilePath in _entryFilePaths)
     {
-		[newEntries addObject:[ZZArchiveEntry archiveEntryWithFileName:entryFilePath
-															  compress:compressed
-															 dataBlock:^{ return [self dataAtFilePath:entryFilePath]; }]];
+		ZZArchiveEntry *entry = [ZZArchiveEntry archiveEntryWithFileName:entryFilePath compress:compressed dataBlock:^{
+			return [self dataAtFilePath:entryFilePath];
+		}];
+		
+		[newEntries addObject:entry];
         
         // Test file wrapper API too
         NSURL *url = [[NSBundle bundleForClass:self.class] URLForResource:entryFilePath withExtension:nil];
@@ -277,6 +279,12 @@
 		NSError *error;
         NSFileWrapper *wrapper = [[NSFileWrapper alloc] initWithURL:url options:0 error:&error];
         STAssertNotNil(wrapper, @"Faild to create wrapper: %@", error);
+		
+		// Match wrapper's timestamp to the entry's. Otherwise checking code will reject it
+		NSMutableDictionary *attributes = [[wrapper fileAttributes] mutableCopy];
+		[attributes setObject:[entry lastModified] forKey:NSFileModificationDate];
+		[wrapper setFileAttributes:attributes];
+		
         [_zipWrapper addFileWrapper:wrapper];
     }
 	
