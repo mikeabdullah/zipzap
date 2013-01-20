@@ -9,6 +9,8 @@
 #import <Foundation/Foundation.h>
 
 
+@class ZZArchiveEntry;
+
 @interface ZZArchiveWrapper : NSFileWrapper
 
 // Creating an Archive Wrapper
@@ -20,5 +22,11 @@
 // Generating a zip file
 - (BOOL)writeToURL:(NSURL *)url options:(NSFileWrapperWritingOptions)options originalContentsURL:(NSURL *)originalContentsURL error:(NSError *__autoreleasing *)outError;
 - (NSData *)regularFileContents;    // unlike NSFileWrapper, doesn't cache
+
+
+#pragma mark Archive Entries
+// Existing entries can be included in archives more efficiently
+- (id)initWithArchiveEntry:(ZZArchiveEntry *)entry __attribute__((nonnull(1)));
+
 
 @end

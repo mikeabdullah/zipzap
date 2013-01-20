@@ -66,6 +66,9 @@
 // Internally hold a wrapper that represents the root of the archive, for adding and removing wrappers from
 @property(readonly) NSFileWrapper *rootWrapper;
 
+// The entry that directly corresponds to this file wrapper, if there is one
+@property(readonly) ZZArchiveEntry *archiveEntry;
+
 @end
 
 
@@ -146,7 +149,11 @@
 
 - (NSData *)regularFileContents;
 {
-    if (![self isArchive]) return [super regularFileContents];
+    if (![self isArchive])
+	{
+		ZZArchiveEntry *entry = [self archiveEntry];
+		return (entry ? [entry data] : [super regularFileContents]);
+	}
     
     // Use ZZMutableArchive to do the dirty work
     NSMutableData *result = [NSMutableData data];
@@ -156,6 +163,34 @@
     [archive setEntries:[self entries]];
     
     return result;
+}
+
+#pragma mark Archive Entries
+
+- (id)initWithArchiveEntry:(ZZArchiveEntry *)entry;
+{
+	NSParameterAssert(entry);
+	
+	// Assume it's a regular file for now
+	if (self = [self init])
+	{
+		_archiveEntry = entry;
+	}
+	return self;
+}
+
+- (void)zz_addArchiveEntriesToMutableArray:(NSMutableArray *)array filename:(NSString *)filename;
+{
+	// Re-use existing entry when possible
+	ZZArchiveEntry *entry = [self archiveEntry];
+	if (entry && [self isRegularFile] && [filename isEqualToString:[entry fileName]])
+	{
+		[array addObject:entry];
+	}
+	else
+	{
+		[super zz_addArchiveEntriesToMutableArray:array filename:filename];
+	}
 }
 
 - (NSArray *)entries;
