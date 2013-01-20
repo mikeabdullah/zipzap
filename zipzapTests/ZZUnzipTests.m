@@ -25,6 +25,7 @@
 	NSURL* _zipFileURL;
 	NSMutableArray* _entryFilePaths;
 	ZZArchive* _zipFile;
+	ZZArchiveWrapper	*_zipWrapper;
 }
 
 - (void)setUp
@@ -40,11 +41,16 @@
 			   toPath:_zipFileURL.path];
 	
 	_zipFile = [ZZArchive archiveWithContentsOfURL:_zipFileURL];
+	
+	NSError *error;
+	_zipWrapper = [[ZZArchiveWrapper alloc] initWithURL:_zipFileURL options:0 error:&error];
+	STAssertNotNil(_zipWrapper, @"Failed to init: %@", error);
 }
 
 - (void)tearDown
 {
 	_zipFile = nil;
+	_zipWrapper = nil;
 	[[NSFileManager defaultManager] removeItemAtURL:_zipFileURL
 											  error:nil];
 }
@@ -99,10 +105,18 @@
 				   zipInfo.count,
 				   @"zipFile.entries.count must match the actual zip entry count.");
 	
+	// Test ZZArchiveWrapper too, although this makes the assumption there are no files nested inside directories
+	STAssertEquals(_zipWrapper.fileWrappers.count,
+				   zipInfo.count,
+				   @"zipWrapper.fileWrappers.count must match the actual zip entry count.");
+	
 	for (NSUInteger index = 0, count = _zipFile.entries.count; index < count; ++index)
 	{
 		ZZArchiveEntry* nextEntry = _zipFile.entries[index];
 		NSArray* nextInfo = zipInfo[index];
+		NSString *filename = nextInfo[8];
+		NSFileWrapper *wrapper = [[_zipWrapper fileWrappers] objectForKey:filename];
+		STAssertNotNil(wrapper, @"Wrapper contains nothing for key: %@", filename);
 		
 		NSDateComponents* dateComponents = [[[NSCalendar alloc] initWithCalendarIdentifier:NSGregorianCalendar]
 											components: NSYearCalendarUnit | NSMonthCalendarUnit | NSDayCalendarUnit
@@ -133,7 +147,10 @@
 								   1,
 								   @"zipFile.entries[%d].lastModified second must match the actual zip entry last modified second.",
 								   index);
-				
+		
+		// Test entry and wrapper date match
+		STAssertEqualObjects(wrapper.fileAttributes.fileModificationDate, nextEntry.lastModified, nil);
+		
 		char nextModeString[12];
 		strmode(nextEntry.fileMode, nextModeString);
 		nextModeString[10] = '\0';	// only want the first 10 chars of the parsed mode
@@ -142,9 +159,20 @@
 							 @"zipFile.entries[%d].fileMode must match the actual zip entry file mode.",
 							 index);
 		
+		strmode([[wrapper.fileAttributes objectForKey:NSFilePosixPermissions] unsignedShortValue], nextModeString);
+		nextModeString[10] = '\0';	// only want the first 10 chars of the parsed mode
+		STAssertEqualObjects([NSString stringWithUTF8String:nextModeString],
+							 nextInfo[0],
+							 @"zipArchive.fileWrappers[%@].fileAttributes.filePosixPermissions must match the actual zip entry file mode.",
+							 filename);
+		
 		STAssertEquals(nextEntry.uncompressedSize,
 					   (NSUInteger)[nextInfo[3] integerValue],
 					   @"zipFile.entries[%d].uncompressedSize must match the actual zip entry uncompressed size.");
+		
+		STAssertEquals(wrapper.fileAttributes.fileSize,
+					   (NSUInteger)[nextInfo[3] integerValue],
+					   @"zipArchive.fileWrappers[%@].fileAttributes.fileSize must match the actual zip entry uncompressed size.");
 		
 		STAssertEquals(nextEntry.compressedSize,
 					   (NSUInteger)[nextInfo[5] integerValue],
@@ -153,6 +181,11 @@
 		STAssertEqualObjects(nextEntry.fileName,
 							 nextInfo[8],
 							 @"zipFile.entries[%d].fileName must match the actual zip entry file name.",
+							 index);
+		
+		STAssertEqualObjects(wrapper.filename,
+							 nextInfo[8],
+							 @"zipArchive.fileWrappers[%@].filename must match the actual zip entry file name.",
 							 index);
 	}
 
@@ -164,14 +197,27 @@
 				   _entryFilePaths.count,
 				   @"zipFile.entries.count must match the original file count.");
 	
+	// Test ZZArchiveWrapper too, although this makes the assumption there are no files nested inside directories
+	STAssertEquals(_zipWrapper.fileWrappers.count,
+				   _entryFilePaths.count,
+				   @"zipWrapper.fileWrappers.count must match the original file count.");
+	
 	for (NSUInteger index = 0, count = _zipFile.entries.count; index < count; ++index)
 	{
 		ZZArchiveEntry* nextEntry = _zipFile.entries[index];
 		NSString* nextEntryFilePath = _entryFilePaths[index];
+
+		NSFileWrapper *wrapper = [[_zipWrapper fileWrappers] objectForKey:nextEntryFilePath];
+		STAssertNotNil(wrapper, @"Wrapper contains nothing for key: %@", nextEntryFilePath);
 		
 		STAssertEqualObjects(nextEntry.fileName,
 							 nextEntryFilePath,
 							 @"zipFile.entries[%d].fileName must match the original file name.",
+							 index);
+		
+		STAssertEqualObjects(wrapper.filename,
+							 nextEntryFilePath,
+							 @"zipArchive.fileWrappers[%@].filename must match the original file name.",
 							 index);
 		
 		NSData* fileData = [self dataAtFilePath:nextEntryFilePath];
@@ -183,6 +229,11 @@
 		STAssertEquals(nextEntry.uncompressedSize,
 					   fileData.length,
 					   @"zipFile.entries[%d].uncompressedSize must match the original file size.",
+					   index);
+		
+		STAssertEquals(wrapper.fileAttributes.fileSize,
+					   fileData.length,
+					   @"zipArchive.fileWrappers[%@].fileSize must match the original file size.",
 					   index);
 	}
 
@@ -224,6 +275,9 @@
 	{
 		ZZArchiveEntry* nextEntry = _zipFile.entries[index];
 		NSString* nextEntryFilePath = _entryFilePaths[index];
+		
+		NSFileWrapper *wrapper = [[_zipWrapper fileWrappers] objectForKey:nextEntryFilePath];
+		STAssertNotNil(wrapper, @"Wrapper contains nothing for key: %@", nextEntryFilePath);
 		
 		STAssertEqualObjects(nextEntry.data,
 							 [self dataAtFilePath:nextEntryFilePath],

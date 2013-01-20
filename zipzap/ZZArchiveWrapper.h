@@ -13,9 +13,15 @@
 
 @interface ZZArchiveWrapper : NSFileWrapper
 
-// Creating an Archive Wrapper
+#pragma mark Creating an Archive Wrapper
+
 - (id)initArchiveWithFileWrapper:(NSFileWrapper *)fileWrapper;
 
+// If the URL turns out to hold a zip file, reports YES from -isArchive and therefore becomes editable
+- (id)initWithURL:(NSURL *)url options:(NSFileWrapperReadingOptions)options error:(NSError *__autoreleasing *)outError;
+
+
+#pragma mark Testing for Archives
 // If -isArchive returns YES (guaranteed to if you used -initArchiveWithFileWrapper:) allows full access to modifying -fileWrappers
 - (BOOL)isArchive;
 

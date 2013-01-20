@@ -11,6 +11,8 @@
 #import "ZZArchive.h"
 #import "ZZArchiveEntry.h"
 
+#include <sys/stat.h>
+
 
 @implementation NSFileWrapper (ZZArchiveWrapper)
 
@@ -86,6 +88,58 @@
     return self;
 }
 
+- (id)initWithURL:(NSURL *)url options:(NSFileWrapperReadingOptions)options error:(NSError *__autoreleasing *)outError;
+{
+	if (self = [super initWithURL:url options:options error:outError])
+	{
+		if ([self isRegularFile] && ![self readFromURL:url options:options error:outError])
+		{
+			self = nil;
+		}
+	}
+	return self;
+}
+
+- (BOOL)readFromURL:(NSURL *)url options:(NSFileWrapperReadingOptions)options error:(NSError *__autoreleasing *)outError;
+{
+	ZZArchive *archive = [ZZArchive archiveWithContentsOfURL:url];
+	NSArray *entries = [archive entries];
+	
+	if (entries)
+	{
+		// Reset super's idea to match the archive on disk
+		if (![super readFromURL:url
+						options:0	// deliberately bypass options, particularly immediate reading
+						  error:outError])
+		{
+			return NO;
+		}
+		
+		
+		// In the unlikely event that super and ZZArchive disagree about the contents of the file, assume it's no longer an archive
+		if (![self isRegularFile]) return YES;
+		
+		
+		// Assemble the entries into a directory structure
+		_rootWrapper = [[NSFileWrapper alloc] initDirectoryWithFileWrappers:nil];
+		
+		for (ZZArchiveEntry *anEntry in entries)
+		{
+			ZZArchiveWrapper *wrapper = [[ZZArchiveWrapper alloc] initWithArchiveEntry:anEntry];
+			[self addFileWrapper:wrapper subdirectory:[[anEntry fileName] stringByDeletingLastPathComponent]];
+		}
+		
+		// TODO: Make sure NSFileWrapper hasn't adjusted any file names from what they are in the archive
+		
+		return YES;
+	}
+	else
+	{
+		// Fallback to regular reading
+		return [super readFromURL:url options:options error:outError];
+	}
+}
+
 #pragma mark Archive Status
 
 - (BOOL)isArchive; { return _rootWrapper != nil; }
@@ -105,6 +159,43 @@
 - (void)removeFileWrapper:(NSFileWrapper *)child;
 {
 	return ([self isArchive] ? [[self rootWrapper] removeFileWrapper:child] : [super removeFileWrapper:child]);
+}
+
+// Based on KSFileUtilities: https://github.com/karelia/KSFileUtilities/blob/master/KSFileWrapperExtensions.m
+- (NSString *)addFileWrapper:(NSFileWrapper *)wrapper subdirectory:(NSString *)subpath;
+{
+    // Create any directories required by the subpath
+    NSArray *components = [subpath pathComponents];
+    NSFileWrapper *parentWrapper = self;
+    
+    NSUInteger i, count = [components count];
+    for (i = 0; i < count; i++)
+    {
+        NSString *aComponent = [components objectAtIndex:i];
+        NSFileWrapper *aWrapper = [[parentWrapper fileWrappers] objectForKey:aComponent];
+		
+		// Throw away existing non-directories in favour of the directory
+		if (aWrapper && ![aWrapper isDirectory])
+		{
+			[parentWrapper removeFileWrapper:aWrapper];
+		}
+		
+        if (!aWrapper)
+        {
+            aWrapper = [[NSFileWrapper alloc] initDirectoryWithFileWrappers:nil];
+            [aWrapper setPreferredFilename:aComponent];
+            [parentWrapper addFileWrapper:aWrapper];
+            
+#if ! __has_feature(objc_arc)
+            [aWrapper release];
+#endif
+        }
+        
+        parentWrapper = aWrapper;
+    }
+    
+    // We finally have a suitable parent to add the wrapper to
+    return [parentWrapper addFileWrapper:wrapper];
 }
 
 #pragma mark Generating a Zip File
