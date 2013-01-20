@@ -32,3 +32,4 @@
 
 #import <zipzap/ZZArchive.h>
 #import <zipzap/ZZArchiveEntry.h>
+#import <zipzap/ZZArchiveWrapper.h>
