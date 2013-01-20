@@ -171,15 +171,40 @@
 {
 	NSParameterAssert(entry);
 	
-	// Assume it's a regular file for now
-	if (self = [self init])
+	mode_t mode = [entry fileMode];
+	NSString *fileType = nil;
+	
+	if (S_ISREG(mode))
+	{
+		self = [self init];
+		fileType = NSFileTypeRegular;
+	}
+	else if (S_ISDIR(mode))
+	{
+		self = [self initDirectoryWithFileWrappers:nil];
+		fileType = NSFileTypeDirectory;
+	}
+	else
+	{
+		self = nil;
+	}
+	
+	if (self)
 	{
 		_archiveEntry = entry;
 		
 		NSString *filename = [[entry fileName] lastPathComponent];	// entry might be nested inside a directory, so grab just last component
 		[self setFilename:filename];
 		[self setPreferredFilename:filename];
+		
+		NSDictionary *attributes = @{ NSFileType : fileType,
+						  NSFilePosixPermissions : @(mode),
+						  NSFileModificationDate : entry.lastModified,
+									  NSFileSize : @(entry.uncompressedSize) };
+		
+		[self setFileAttributes:attributes];
 	}
+	
 	return self;
 }
 
