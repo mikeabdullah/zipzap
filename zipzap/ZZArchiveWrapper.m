@@ -86,11 +86,20 @@
 
 #pragma mark Modifying Archive Contents
 
-- (NSDictionary *)fileWrappers; { return [[self rootWrapper] fileWrappers]; }
+- (NSDictionary *)fileWrappers;
+{
+	return ([self isArchive] ? [[self rootWrapper] fileWrappers] : [super fileWrappers]);
+}
 
-- (NSString *)addFileWrapper:(NSFileWrapper *)child; { return [[self rootWrapper] addFileWrapper:child]; }
+- (NSString *)addFileWrapper:(NSFileWrapper *)child;
+{
+	return ([self isArchive] ? [[self rootWrapper] addFileWrapper:child] : [super addFileWrapper:child]);
+}
 
-- (void)removeFileWrapper:(NSFileWrapper *)child; { return [[self rootWrapper] removeFileWrapper:child]; }
+- (void)removeFileWrapper:(NSFileWrapper *)child;
+{
+	return ([self isArchive] ? [[self rootWrapper] removeFileWrapper:child] : [super removeFileWrapper:child]);
+}
 
 #pragma mark Generating a Zip File
 
