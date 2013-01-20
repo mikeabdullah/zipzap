@@ -58,6 +58,9 @@
 @end
 
 
+#pragma mark -
+
+
 @interface ZZArchiveWrapper ()
 
 // Internally hold a wrapper that represents the root of the archive, for adding and removing wrappers from
