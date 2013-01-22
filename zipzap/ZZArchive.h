@@ -53,6 +53,11 @@
 @property (readonly, copy, nonatomic) NSArray* entries;
 
 /**
+ * Collects the archive's entries into a nice directory pattern
+ */
+- (NSDictionary *)fileWrappers;
+
+/**
  * Creates a new archive with the zip file at the given file URL.
  *
  * The archive will use UTF-8 encoding for reading entry file names and comments.

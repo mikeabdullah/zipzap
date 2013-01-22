@@ -14,6 +14,7 @@
 #import "ZZFileChannel.h"
 #import "ZZArchiveEntryWriter.h"
 #import "ZZArchive.h"
+#import "ZZArchiveWrapper.h"
 #import "ZZHeaders.h"
 #import "ZZOldArchiveEntry.h"
 
@@ -78,6 +79,57 @@
 - (NSURL*)URL
 {
 	return _channel.URL;
+}
+
+- (NSDictionary *)fileWrappers;
+{
+	NSFileWrapper *rootWrapper = [[NSFileWrapper alloc] initDirectoryWithFileWrappers:nil];
+	
+	for (ZZArchiveEntry *anEntry in self.entries)
+	{
+		[self addFileWrapper:[[ZZArchiveWrapper alloc] initWithArchiveEntry:anEntry]
+				   toWrapper:rootWrapper
+				subdirectory:[[anEntry fileName] stringByDeletingLastPathComponent]];
+	}
+	
+	return [rootWrapper fileWrappers];
+	// TODO: Make sure NSFileWrapper hasn't adjusted any file names from what they are in the archive
+}
+
+// Based on KSFileUtilities: https://github.com/karelia/KSFileUtilities/blob/master/KSFileWrapperExtensions.m
+- (NSString *)addFileWrapper:(NSFileWrapper *)wrapper toWrapper:(NSFileWrapper *)parentWrapper subdirectory:(NSString *)subpath;
+{
+    // Create any directories required by the subpath
+    NSArray *components = [subpath pathComponents];
+    
+    NSUInteger i, count = [components count];
+    for (i = 0; i < count; i++)
+    {
+        NSString *aComponent = [components objectAtIndex:i];
+        NSFileWrapper *aWrapper = [[parentWrapper fileWrappers] objectForKey:aComponent];
+		
+		// Throw away existing non-directories in favour of the directory
+		if (aWrapper && ![aWrapper isDirectory])
+		{
+			[parentWrapper removeFileWrapper:aWrapper];
+		}
+		
+        if (!aWrapper)
+        {
+            aWrapper = [[NSFileWrapper alloc] initDirectoryWithFileWrappers:nil];
+            [aWrapper setPreferredFilename:aComponent];
+            [parentWrapper addFileWrapper:aWrapper];
+            
+#if ! __has_feature(objc_arc)
+            [aWrapper release];
+#endif
+        }
+        
+        parentWrapper = aWrapper;
+    }
+    
+    // We finally have a suitable parent to add the wrapper to
+    return [parentWrapper addFileWrapper:wrapper];
 }
 
 - (void)reload

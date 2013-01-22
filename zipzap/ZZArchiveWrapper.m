@@ -164,16 +164,7 @@
 - (BOOL)readFromArchive:(ZZArchive *)archive error:(NSError *__autoreleasing *)error;
 {
 	// Assemble the entries into a directory structure
-	_rootWrapper = [[NSFileWrapper alloc] initDirectoryWithFileWrappers:nil];
-	
-	for (ZZArchiveEntry *anEntry in archive.entries)
-	{
-		ZZArchiveWrapper *wrapper = [[ZZArchiveWrapper alloc] initWithArchiveEntry:anEntry];
-		[self addFileWrapper:wrapper subdirectory:[[anEntry fileName] stringByDeletingLastPathComponent]];
-	}
-	
-	// TODO: Make sure NSFileWrapper hasn't adjusted any file names from what they are in the archive
-	
+	_rootWrapper = [[NSFileWrapper alloc] initDirectoryWithFileWrappers:[archive fileWrappers]];
 	return YES;
 }
 
@@ -196,43 +187,6 @@
 - (void)removeFileWrapper:(NSFileWrapper *)child;
 {
 	return ([self isArchive] ? [[self rootWrapper] removeFileWrapper:child] : [super removeFileWrapper:child]);
-}
-
-// Based on KSFileUtilities: https://github.com/karelia/KSFileUtilities/blob/master/KSFileWrapperExtensions.m
-- (NSString *)addFileWrapper:(NSFileWrapper *)wrapper subdirectory:(NSString *)subpath;
-{
-    // Create any directories required by the subpath
-    NSArray *components = [subpath pathComponents];
-    NSFileWrapper *parentWrapper = self;
-    
-    NSUInteger i, count = [components count];
-    for (i = 0; i < count; i++)
-    {
-        NSString *aComponent = [components objectAtIndex:i];
-        NSFileWrapper *aWrapper = [[parentWrapper fileWrappers] objectForKey:aComponent];
-		
-		// Throw away existing non-directories in favour of the directory
-		if (aWrapper && ![aWrapper isDirectory])
-		{
-			[parentWrapper removeFileWrapper:aWrapper];
-		}
-		
-        if (!aWrapper)
-        {
-            aWrapper = [[NSFileWrapper alloc] initDirectoryWithFileWrappers:nil];
-            [aWrapper setPreferredFilename:aComponent];
-            [parentWrapper addFileWrapper:aWrapper];
-            
-#if ! __has_feature(objc_arc)
-            [aWrapper release];
-#endif
-        }
-        
-        parentWrapper = aWrapper;
-    }
-    
-    // We finally have a suitable parent to add the wrapper to
-    return [parentWrapper addFileWrapper:wrapper];
 }
 
 #pragma mark Generating a Zip File
